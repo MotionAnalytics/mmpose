@@ -5,8 +5,8 @@ ARG PYTORCH="2.3.1"
 ARG CUDA="11.8"
 ARG CUDNN="8"
 
-FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
-
+# This digest is from your successful build log, it will never change
+FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-devel@sha256:5c2e1d0bbe0f000b12aef0dfba9980790c1240d40498a9f67d01bd2bfc131461
 # ------------------------------------------------------------
 # Environment setup
 # ------------------------------------------------------------
@@ -27,21 +27,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ------------------------------------------------------------
 # Install Python deps and OpenMMLab stack
 # ------------------------------------------------------------
-RUN pip install --upgrade pip==25.2 setuptools wheel
-RUN pip install cython openmim
-RUN pip install git+https://github.com/jin-s13/xtcocoapi
+# Pin build tools (pip==25.2 is the fix you found)
+RUN pip install --upgrade pip==25.2 setuptools==80.9.0 wheel==0.45.1
 
-# Install MMEngine and MMCV with version constraints for reproducibility
-RUN mim install "mmengine>=0.4.0,<1.0.0" "mmcv>=2.1.0,<2.2.0"
+# Pin cython (used for compiling) and openmim
+RUN pip install cython==3.1.5 openmim==0.3.9
 
+# Pin xtcocoapi to the exact commit and add the isolation fix
+RUN pip install --no-build-isolation git+https://github.com/jin-s13/xtcocoapi@d74033ff1635e9002133b2380862bc2b728584d2
+
+# Pin MMLab libraries to exact versions
+RUN mim install mmengine==0.10.7 mmcv==2.1.0
+
+# Pin notebook
+RUN pip install notebook==7.4.7
+
+# Pin mmdet
+RUN mim install mmdet==3.2.0
 # ------------------------------------------------------------
 # Clone and install MMPose
 # ------------------------------------------------------------
 RUN git clone https://github.com/open-mmlab/mmpose.git /mmpose
 WORKDIR /mmpose
-
-# Pin to specific commit for reproducibility (replace with actual commit if needed)
-RUN git checkout main
+# Checkout the stable v1.3.2 tag instead of the changing 'main' branch
+RUN git checkout v1.3.2
 
 RUN pip install -r requirements/build.txt
 RUN pip install --no-cache-dir -e .
@@ -51,16 +60,12 @@ RUN pip install notebook
 # Install MMDetection & fix xtcocotools incompatibility
 # ------------------------------------------------------------
 RUN mim install "mmdet>=3.0.0,<3.3.0"
-
+Run mim install "mmpretrain<1.0.0"
 
 # Uninstall the pre-compiled xtcocotools and reinstall it from source
 # to ensure it's compiled against the correct NumPy version.
 RUN pip uninstall xtcocotools -y
 RUN pip install --no-binary xtcocotools xtcocotools
-
-Run mim install "mmpretrain"
-Run mim install "mmtrack"
-Run pip install "matplotlib<3.10"
 
 # ------------------------------------------------------------
 # Clean up
