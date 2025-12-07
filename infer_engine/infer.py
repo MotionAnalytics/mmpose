@@ -29,20 +29,31 @@ os.environ['TORCH_HOME'] = str(TORCH_CACHE_DIR)
 from mmpose.apis.inferencers import MMPoseInferencer
 
 
+models_3d = [
+    "human3d",
+]
+models_2d = [
+    "vitpose",
+]
 
 
-
-def pred_vid(video, vis_dir, pred_dir) -> None:
+def pred_vid(video, vis_dir, pred_dir,model) -> None:
     # --- MODIFIED: Initialize inferencer for 2D Pose Tracking ---
     print(f"Initializing inferencer. Weights will be downloaded to: {os.environ['MMENGINE_CACHE_DIR']}")
-    inferencer = MMPoseInferencer(
-        pose2d='vitpose',  # Use ViTPose model for 2D pose estimation
-        #det_model='rtmdet-m',  # Use RTMDet-m for person detection (required for top-down)
-        # When processing a video, the inferencer automatically applies
-        # tracking (e.g., OCSORT) to the detected instances.
-        device='cuda:0' if torch.cuda.is_available() else 'cpu',
-        show_progress=True,
-    )
+    if model in models_3d:
+        inferencer = MMPoseInferencer(
+            pose3d=f'{model}',  # Use ViTPose model for 2D pose estimation
+            device='cuda:0' if torch.cuda.is_available() else 'cpu',
+            show_progress=True,
+        )
+    elif model in models_2d:
+        inferencer = MMPoseInferencer(
+            pose2d=f'{model}',  # Use ViTPose model for 2D pose estimation
+            device='cuda:0' if torch.cuda.is_available() else 'cpu',
+            show_progress=True,
+        )
+    else:
+        raise ValueError(f"Model {model} not recognized. Choose from {models_2d + models_3d}.")
     # ----------------------------------------------------------
 
     all_frames: List[Dict[str, Any]] = []
@@ -83,11 +94,14 @@ def main():
     ap.add_argument("--video", default=""
                     , help="Container path for input video")
     ap.add_argument("--outdir", default="", help="Container path for outputs")
+    #ap.add_argument("--model", default="vitpose", help="Pose model to use")
+    ap.add_argument("--model", default="human3d", help="Pose model to use")
 
     args = ap.parse_args()
     if not args.video:
-        args.video = str(Path(
-            __file__).resolve().parent.parent / "tests/data/posetrack18/videos/000001_mpiinew_test/000001_mpiinew_test.mp4")
+        #args.video = str(Path(
+            #__file__).resolve().parent.parent / "tests/data/posetrack18/videos/000001_mpiinew_test/000001_mpiinew_test.mp4")
+        args.video = str(Path(__file__).parent/'vid_0.mp4')
     if not args.outdir:
         args.outdir = str(Path(__file__).resolve().parent.parent / "outputs")
     # Prepare output directories
@@ -106,7 +120,7 @@ def main():
     print(f"Model weights will be saved to: {os.environ.get('MMENGINE_CACHE_DIR', 'Default cache')}")
     # -------------------------------------------
 
-    pred_vid(video_path, vis_dir, pred_dir)
+    pred_vid(video_path, vis_dir, pred_dir, args.model)
 
 
 if __name__ == "__main__":
