@@ -55,52 +55,47 @@ def load_custom_bboxes(bbox_path: str) -> List[Any]:
 def clean_and_interpolate_bboxes(bboxes: List[List[List[float]]]) -> List[List[List[float]]]:
     """
     Replaces NaN values in bounding boxes with valid coordinates via linear interpolation.
-    If the start or end are NaNs, it pads with the nearest valid box.
+    Also ensures boxes have a 5th element (score=1.0) for MMPose compatibility.
     """
-    print("Cleaning and interpolating bounding boxes...")
+    print("Cleaning, interpolating, and scoring bounding boxes...")
 
-    # Flatten structure slightly for processing: List of [x1, y1, x2, y2]
-    # Assuming 1 bbox per frame for this specific single-person tracking use case
     flat_bboxes = []
+    # 1. Flatten and Handle NaNs
     for frame_boxes in bboxes:
         if not frame_boxes or len(frame_boxes) == 0:
             flat_bboxes.append(np.array([np.nan, np.nan, np.nan, np.nan]))
         else:
-            # Take the first box if multiple exist (though your file implies 1 per frame)
-            box = frame_boxes[0]
+            # Take only the first 4 coordinates (x1, y1, x2, y2) ignoring any existing score
+            box = frame_boxes[0][:4]
             flat_bboxes.append(np.array(box))
 
     flat_bboxes = np.array(flat_bboxes)  # Shape (N, 4)
 
-    # DataFrame-like interpolation using numpy
+    # 2. Interpolate
     n_frames = len(flat_bboxes)
-
-    # Check for valid indices (rows that are not all NaN)
     valid_mask = ~np.isnan(flat_bboxes).any(axis=1)
     valid_indices = np.where(valid_mask)[0]
 
     if len(valid_indices) == 0:
         print("Warning: No valid bounding boxes found in file!")
-        return bboxes  # Return original to avoid crash, though it will fail later
+        return bboxes
 
-    # Interpolate for each coordinate (x1, y1, x2, y2)
     cleaned_bboxes = np.copy(flat_bboxes)
-
     for col in range(4):
-        # Linear interpolation
         cleaned_bboxes[:, col] = np.interp(
             np.arange(n_frames),
             valid_indices,
             flat_bboxes[valid_indices, col]
         )
 
-    # Reconstruct the original list format: List[List[List[float]]]
+    # 3. Reconstruct with Score Appended [x1, y1, x2, y2, 1.0]
     final_output = []
     for row in cleaned_bboxes:
-        # Convert back to list of lists structure expected by MMPose
-        final_output.append([row.tolist()])
+        # Append 1.0 as the confidence score
+        box_with_score = row.tolist() + [1.0]
+        final_output.append([box_with_score])
 
-    print(f"Interpolated {n_frames} frames of bounding boxes.")
+    print(f"Interpolated {n_frames} frames and appended confidence scores.")
     return final_output
 
 
@@ -110,10 +105,8 @@ def pred_vid(video, vis_dir, pred_dir, model, bboxes_path=None) -> None:
     # Check if we are using custom bboxes
     custom_bboxes = load_custom_bboxes(bboxes_path)
 
-    # --- NEW: Clean the bboxes before use ---
     if custom_bboxes is not None:
         custom_bboxes = clean_and_interpolate_bboxes(custom_bboxes)
-    # ----------------------------------------
 
     if model in models_3d:
         inferencer = MMPoseInferencer(
@@ -176,6 +169,8 @@ def parse_args():
     if not args.video:
         args.video = str(SCRIPT_DIR / 'demos' / "gait" / "NoamB-Adj-R2L-Hi" / 'NoamB-Adj-R2L-Hi.MOV')
         args.bboxes = str(SCRIPT_DIR / 'demos' / "gait" / "NoamB-Adj-R2L-Hi" / 'NoamB-Adj-R2L-Hi_T1.json')
+        args.video = str(SCRIPT_DIR / 'demos' / "gait" / "IMG_9711-000" / 'IMG_9711-000.mp4')
+        args.bboxes = str(SCRIPT_DIR / 'demos' / "gait" / "IMG_9711-000" / 'SplitterPipeline_splitter-IMG_9711-000-detections.json')
     if not args.outdir:
         args.outdir = str(SCRIPT_DIR / "demos" / "outputs")
     return args
