@@ -156,8 +156,8 @@ class Pose2DInferencer(BaseMMPoseInferencer):
         data_info.update(self.model.dataset_meta)
 
         if self.cfg.data_mode == 'topdown':
-            bboxes = []
-            if self.detector is not None:
+            bboxes = np.array(bboxes)
+            if self.detector is not None and len(bboxes) == 0:
                 try:
                     det_results = self.detector(
                         input, return_datasamples=True)['predictions']
