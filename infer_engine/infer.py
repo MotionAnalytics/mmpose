@@ -167,8 +167,6 @@ def parse_args():
 
     args = ap.parse_args()
     if not args.video:
-        args.video = str(SCRIPT_DIR / 'demos' / "gait" / "NoamB-Adj-R2L-Hi" / 'NoamB-Adj-R2L-Hi.MOV')
-        args.bboxes = str(SCRIPT_DIR / 'demos' / "gait" / "NoamB-Adj-R2L-Hi" / 'NoamB-Adj-R2L-Hi_T1.json')
         args.video = str(SCRIPT_DIR / 'demos' / "gait" / "IMG_9711-000" / 'IMG_9711-000.mp4')
         args.bboxes = str(SCRIPT_DIR / 'demos' / "gait" / "IMG_9711-000" / 'SplitterPipeline_splitter-IMG_9711-000-detections.json')
     if not args.outdir:
