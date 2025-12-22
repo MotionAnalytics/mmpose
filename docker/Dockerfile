@@ -1,7 +1,9 @@
 # ------------------------------------------------------------
-# Base image – Downgrade to 2.1.0 (Best compatibility with MMCV wheels)
+# Base image – modern PyTorch with CUDA 11.8 + cuDNN 8
 # ------------------------------------------------------------
-ARG PYTORCH="2.1.0"
+
+# Downgrade PYTORCH to 2.1.0 (Best compatibility with MMCV wheels)
+ARG PYTORCH="2.1.0" 
 ARG CUDA="11.8"
 ARG CUDNN="8"
 
