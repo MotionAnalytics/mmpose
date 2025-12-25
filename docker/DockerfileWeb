@@ -1,0 +1,103 @@
+
+# ------------------------------------------------------------
+# Base image – modern PyTorch with CUDA 11.8 + cuDNN 8
+# ------------------------------------------------------------
+ARG PYTORCH="2.3.1"
+ARG CUDA="11.8"
+ARG CUDNN="8"
+
+FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
+
+# ------------------------------------------------------------
+# Environment setup
+# ------------------------------------------------------------
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0 7.5 8.0+PTX"
+ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
+ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
+ENV FORCE_CUDA="1"
+
+# ------------------------------------------------------------
+# Fix for NVIDIA repo key & basic dependencies
+# ------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git ninja-build libglib2.0-0 libsm6 libxrender-dev libxext6 libgl1-mesa-glx \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------
+# Install Python deps and OpenMMLab stack
+# ------------------------------------------------------------
+RUN pip install --upgrade pip==25.2 setuptools wheel
+RUN pip install cython openmim
+RUN pip install git+https://github.com/jin-s13/xtcocoapi
+
+# Install MMEngine and MMCV with version constraints for reproducibility
+RUN mim install "mmengine>=0.4.0,<1.0.0" "mmcv>=2.1.0,<2.2.0"
+
+# ------------------------------------------------------------
+# Clone and install MMPose
+# ------------------------------------------------------------
+RUN git clone https://github.com/open-mmlab/mmpose.git /mmpose
+WORKDIR /mmpose
+
+# Pin to specific commit for reproducibility (replace with actual commit if needed)
+RUN git checkout main
+
+RUN pip install -r requirements/build.txt
+RUN pip install --no-cache-dir -e .
+RUN pip install notebook
+
+# ------------------------------------------------------------
+# Copy infer_engine and mmpose_web
+# ------------------------------------------------------------
+COPY infer_engine /mmpose/infer_engine
+COPY mmpose_web /mmpose/mmpose_web
+
+# ------------------------------------------------------------
+# Install web server dependencies
+# ------------------------------------------------------------
+RUN pip install --no-cache-dir -r /mmpose/mmpose_web/requirements.txt
+
+# ------------------------------------------------------------
+# Install MMDetection & fix xtcocotools incompatibility
+# ------------------------------------------------------------
+RUN mim install "mmdet>=3.0.0,<3.3.0"
+
+
+# Uninstall the pre-compiled xtcocotools and reinstall it from source
+# to ensure it's compiled against the correct NumPy version.
+RUN pip uninstall xtcocotools -y
+RUN pip install --no-binary xtcocotools xtcocotools
+
+RUN mim install "mmpretrain"
+RUN mim install "mmtrack"
+RUN pip install "matplotlib<3.10"
+
+# ------------------------------------------------------------
+# Clean up
+# ------------------------------------------------------------
+RUN conda clean --all -f -y
+
+# ------------------------------------------------------------
+# Make conda activate work out-of-the-box in interactive shells
+# ------------------------------------------------------------
+SHELL ["/bin/bash", "--login", "-c"]
+
+RUN conda init bash \
+ && echo "conda activate base" >> ~/.bashrc
+
+# ------------------------------------------------------------
+# Expose web server port
+# ------------------------------------------------------------
+EXPOSE 8000
+
+# ------------------------------------------------------------
+# Set working directory to mmpose_web
+# ------------------------------------------------------------
+WORKDIR /mmpose/mmpose_web
+
+# ------------------------------------------------------------
+# Start the web server automatically
+# ------------------------------------------------------------
+CMD ["python", "app.py"]
