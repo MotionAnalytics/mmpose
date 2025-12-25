@@ -150,14 +150,24 @@ def pred_vid(video, vis_dir, pred_dir, model,model_2d, bboxes_path=None) -> None
     try:
         saved_frames = load_saved_video_predictions(pred_dir, video)
     except Exception as e:
-        print(f"Notice: Could not load saved JSON automatically ({e}). Using in-memory results.")
-        saved_frames = all_frames
+        raise RuntimeError(f"Failed to load saved predictions from {pred_dir}") from e
+    json_path = pred_dir / (video.stem + ".json")
+    vis_path = vis_dir / (video.stem + ".mp4")
+
+    if model != "vitpose":
+        # rename the preds json and the visualization files to include the model name
+        if json_path.exists():
+            json_path.rename(pred_dir / (video.stem + model + ".json"))
+            json_path = pred_dir / (video.stem + model + ".json")
+        if vis_path.exists():
+            vis_path.rename(vis_dir / (video.stem + model + ".mp4"))
+            vis_path = vis_dir / (video.stem + model + ".mp4")
 
     total_frames = len(all_frames)
     total_people = sum(len(f['instances']) for f in all_frames)
     print(f'Processed {total_frames} frames, detected {total_people} person-instances.')
-    print(f'Saved visualizations to: {vis_dir}')
-    print(f'Saved predictions JSON to: {pred_dir / (video.stem + model + ".json")}')
+    print(f'Saved visualizations to: {vis_path}')
+    print(f'Saved predictions JSON to: {json_path}')
 
 
 def parse_args():
