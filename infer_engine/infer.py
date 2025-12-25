@@ -99,7 +99,7 @@ def clean_and_interpolate_bboxes(bboxes: List[List[List[float]]]) -> List[List[L
     return final_output
 
 
-def pred_vid(video, vis_dir, pred_dir, model, bboxes_path=None) -> None:
+def pred_vid(video, vis_dir, pred_dir, model,model_2d, bboxes_path=None) -> None:
     print(f"Initializing inferencer. Weights will be downloaded to: {os.environ['MMENGINE_CACHE_DIR']}")
 
     # Check if we are using custom bboxes
@@ -110,6 +110,8 @@ def pred_vid(video, vis_dir, pred_dir, model, bboxes_path=None) -> None:
 
     if model in models_3d:
         inferencer = MMPoseInferencer(
+            pose2d=str(model_map.get(model_2d)[0]) if model_2d in model_map else f'{model_2d}',
+            pose2d_weights=str(model_map.get(model_2d)[1]) if model_2d in model_map else None,
             pose3d=f'{model}',
             device='cuda:0' if torch.cuda.is_available() else 'cpu',
             show_progress=True,
@@ -163,6 +165,7 @@ def parse_args():
     ap.add_argument("--video", default="", help="Container path for input video")
     ap.add_argument("--outdir", default="", help="Container path for outputs")
     ap.add_argument("--model", default="vitpose", help="Pose model to use")
+    ap.add_argument("--model_2d", default="vitpose", help="Pose model to use as base for 3D models")
     ap.add_argument("--bboxes", default=None, help="Path to JSON file containing custom bounding boxes")
 
     args = ap.parse_args()
@@ -188,7 +191,9 @@ def main():
     vis_dir.mkdir(parents=True, exist_ok=True)
     pred_dir.mkdir(parents=True, exist_ok=True)
 
-    pred_vid(video=video_path, vis_dir=vis_dir, pred_dir=pred_dir, model=args.model, bboxes_path=args.bboxes)
+    pred_vid(video=video_path, vis_dir=vis_dir, pred_dir=pred_dir,
+             model=args.model,model_2d =args.model_2d,
+             bboxes_path=args.bboxes)
 
 
 if __name__ == "__main__":
