@@ -187,11 +187,21 @@ class Pose2DInferencer(BaseMMPoseInferencer):
 
             data_infos = []
             if len(bboxes) > 0:
-                for bbox in bboxes:
+                if bboxes.ndim == 2:
+                    for bbox in bboxes:
+                        inst = data_info.copy()
+                        inst['bbox'] = bbox[None, :4]
+                        inst['bbox_score'] = bbox[4:5]
+                        data_infos.append(self.pipeline(inst))
+                elif bboxes.ndim == 1:
                     inst = data_info.copy()
-                    inst['bbox'] = bbox[None, :4]
-                    inst['bbox_score'] = bbox[4:5]
+                    inst['bbox'] = bboxes[None, :4]
+                    inst['bbox_score'] = bboxes[4:5]
                     data_infos.append(self.pipeline(inst))
+                else:
+                    raise ValueError(
+                        'The dimension of bboxes should be either 1 or 2, '
+                        f'but got {bboxes.ndim}.')
             else:
                 inst = data_info.copy()
 
